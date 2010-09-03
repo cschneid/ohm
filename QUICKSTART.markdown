@@ -47,9 +47,9 @@ Ohm is available as a rubygem.  Install it as with any other Rubygem.  Add
 Installing Redis 
 -----------------
 
-The package manager for your environment probably has a package for Redis.  Be
-sure it installs at least version 1.3.10.  Ohm is compatible with Redis 2 as
-well.
+The package manager for your environment probably has a package for Redis.
+Redis 2+ is strongly preferred, but Ohm works with any version from 1.3.10 and
+beyond.
 
     port install redis
     brew install redis
@@ -220,27 +220,153 @@ layer of whatever application you are writing.
 
 Now you have nicely formatted error messages defined in your view, ready to be displayed.
 
+Custom Validations
+------------------
+
+The real power of validations in Ohm is that you can write domain specific
+validations.  For example, instead of using a format validation for email, you
+can create an assert_email validation.
+
+    def assert_email(attr)
+      assert read_local(attr) =~ /^.*@.*$/, [attr, :not_email]
+    end
+
+    def validate
+      assert_email :email
+    end
+
 Blog Example 
 =============
 
-The post 
+This is a quick runthrough of how to architect the database layer of a
+hypothetical blog.  We will focus entirely on the Ohm layer, and gloss over any
+web related items.
+
+Check the examples/blog directory for a full source file of this example.
+
+Starting off
+------------
+
+Before we do anything, we will need to import Ohm.
+
+    require 'rubygems'
+    require 'ohm'
+
+And connect to Redis using default options
+
+    Ohm.connect
+
+The Post 
 ---------
 
-The author 
+The core of a blog is the list of posts.
+
+    class Post < Ohm::Model
+      attribute :title
+      attribute :slug
+      attribute :body
+      index :slug
+
+      # When we save, calculate the slug if we need to, then continue on with
+      # Ohm's normal save behavior
+      def save
+        calculate_slug if slug.nil?
+        super
+      end
+
+      def validate
+        assert_present :title
+        assert_present :slug
+        assert_present :body
+
+        assert_unique :slug
+      end
+
+      def calculate_slug
+        slug = title.gsub(/\W+/, '-'). # Remove non-word chars
+                     gsub(/^-+/,'').   # Remove a leading dash
+                     gsub(/-+$/,'').   # Remove a trailing dash
+                     downcase
+      end
+    end
+
+
+The Author 
 -----------
+    class Author < Ohm::Model
+      collection :posts, Post
 
-The comments 
+      attribute :name
+      attribute :email
+
+      def validate
+        assert_present :name
+        assert_present :email
+      end
+    end
+
+    class Post < Ohm::Model
+      reference :author, Author
+    end
+
+The Comments 
 -------------
+    class Comment < Ohm::Model
+      reference :post, Post
 
-Finding posts 
+      attribute :body
+
+      def validate
+        assert_present :body
+      end
+    end
+
+    class Post < Ohm::Model
+      collection :comments, Comment
+    end
+
+
+Finding Posts 
 --------------
+
+When you start off, there won't be any posts.
+
+    Post.all # => []
+    Post.size # => 0
+
+Later, you can find your posts
+
+    Post.find(:slug => "ohm-rocks")
+
+Or search by author.  This is a bit tricky, since .find() always returns a
+collection, even if it's empty.  So you need to .all to convert to an array,
+then [0] to get the first element of that array.
+
+    Author.find(:name => "Chris").all[0].posts
+
 
 Creating Posts 
 ---------------
 
+    chris = Author.find(:name => "Chris").all[0].posts
+    Post.create({:title => "Ohm Rocks Part 2", :body => "yep, it really does rock", :author => chris})
+
+
 Creating Comments 
 ------------------
 
+    p = Post[10]
+    p.comments << Comment.create(:body => "Very insightful, Ohm does indeed rock")
+
+Looping Over Comments
+---------------------
+
+This is simple, and just like normal Ruby. 
+
+    p = Post[10]
+    p.comments.each do |comment|
+      puts comment.body
+    end
 
 RANDOM STUFF
 ============
@@ -261,4 +387,11 @@ Behind the Scenes
 
 What keys is your data in?
 --------------------------
+
+
+read\_local write\_local
+----------------------
+What are these really for?
+
+How to best describe them
 
