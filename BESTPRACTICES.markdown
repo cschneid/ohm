@@ -1,8 +1,28 @@
 Ohm Best Practices
 ==================
 
+Denormalization with Set & List
+-------------------------------
+
+Don't let yourself get stuck with the traditional relational database idea of
+normalizing all of your data.  Your app probably has chunks of data that make
+sense only as a whole.
+
+Rather than creating a new model for these pieces of data, consider a list, or
+set on the parent model, and storing structured data as a string.  This can be 
+XML, JSON, YAML, or any other serialization format you'd want.
+
+Don't overuse this approach, but be aware that it it s a great option to
+simplify and organize your data model.
+
+
+Migrations
+----------
+
 Testing
 -------
+
+
 
 Spawning Records
 ----------------
@@ -32,6 +52,7 @@ Using them is simple:
 
 Then to spawn a new Post, you call:
 
+    # Faked title and author
     Post.spawn
 
     # Fixed title, faked author
@@ -86,3 +107,5 @@ So abstract your code out, and make that a library.
 
 Now the logic for boolean attributes is in one reusable place, rather than
 repeated and scattered through your code.
+
+
